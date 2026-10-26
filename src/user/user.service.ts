@@ -1,96 +1,68 @@
-// src/user/user.service.ts
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto.js';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
-import { User } from './entities/user.entity.js';
+
+const publicSelect = {
+  id: true,
+  email: true,
+  name: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 @Injectable()
 export class UserService {
-  private readonly users: User[] = [];
-  private nextId = 1;
+  constructor(private readonly prisma: PrismaService) {}
 
-  create(dto: CreateUserDto): User {
-    this.assertValidCreate(dto);
-    this.assertEmailFree(dto.email);
+  // Used by AuthService.register — password already hashed
+  create(data: { email: string; name: string; password: string }) {
+    return this.prisma.user.create({ data, select: publicSelect });
+  }
 
-    const user: User = {
-      id: this.nextId++,
-      name: dto.name.trim(),
-      email: dto.email.trim().toLowerCase(),
-      createdAt: new Date().toISOString(),
-    };
-    this.users.push(user);
+  findAll() {
+    return this.prisma.user.findMany({ select: publicSelect });
+  }
+
+  async findOne(id: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: publicSelect,
+    });
+    if (!user) throw new NotFoundException(`User ${id} not found`);
     return user;
   }
 
-  findAll(): User[] {
-    return this.users;
+  // Used by JwtStrategy — returns null instead of throwing
+  findById(id: number) {
+    return this.prisma.user.findUnique({
+      where: { id },
+      select: publicSelect,
+    });
   }
 
-  findOne(id: number): User {
-    const user = this.users.find((u) => u.id === id);
-    if (!user) throw new NotFoundException(`User #${id} not found`);
-    return user;
+  findByEmail(email: string) {
+    return this.prisma.user.findUnique({
+      where: { email },
+      select: publicSelect,
+    });
   }
 
-  update(id: number, dto: UpdateUserDto): User {
-    const user = this.findOne(id);
-
-    if (dto.name !== undefined) {
-      this.assertName(dto.name);
-      user.name = dto.name.trim();
-    }
-    if (dto.email !== undefined) {
-      this.assertEmail(dto.email);
-      const normalized = dto.email.trim().toLowerCase();
-      this.assertEmailFree(normalized, id); // allow keeping own email
-      user.email = normalized;
-    }
-    return user;
+  // Only place password leaves the DB
+  findByEmailWithPassword(email: string) {
+    return this.prisma.user.findUnique({ where: { email } });
   }
 
-  remove(id: number): User {
-    const index = this.users.findIndex((u) => u.id === id);
-    if (index === -1) throw new NotFoundException(`User #${id} not found`);
-    return this.users.splice(index, 1)[0];
+  async update(id: number, dto: UpdateUserDto) {
+    await this.findOne(id);
+    return this.prisma.user.update({
+      where: { id },
+      data: dto,
+      select: publicSelect,
+    });
   }
 
-  // ---- manual validation helpers ----
-
-  private assertValidCreate(dto: CreateUserDto): void {
-    if (!dto || typeof dto !== 'object') {
-      throw new BadRequestException('Body must be an object');
-    }
-    this.assertName(dto.name);
-    this.assertEmail(dto.email);
-  }
-
-  private assertName(name: unknown): void {
-    if (typeof name !== 'string' || name.trim().length < 2) {
-      throw new BadRequestException(
-        'name must be a string of at least 2 chars',
-      );
-    }
-  }
-
-  private assertEmail(email: unknown): void {
-    if (
-      typeof email !== 'string' ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-    ) {
-      throw new BadRequestException('email must be a valid email address');
-    }
-  }
-
-  private assertEmailFree(email: string, exceptId?: number): void {
-    const exists = this.users.some(
-      (u) => u.email === email && u.id !== exceptId,
-    );
-    if (exists) throw new ConflictException(`email ${email} already in use`);
+  async remove(id: number) {
+    await this.findOne(id);
+    await this.prisma.user.delete({ where: { id } });
   }
 }

@@ -21,12 +21,6 @@ import { UpdateUserDto } from './dto/update-user.dto.js';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Post()
-  @Header('Cache-Control', 'no-store')
-  create(@Body() dto: CreateUserDto) {
-    return this.userService.create(dto);
-  }
-
   @Get()
   findAll() {
     return this.userService.findAll();
