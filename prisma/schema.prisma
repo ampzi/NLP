@@ -6,13 +6,133 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────
+
+enum MonitorStatus {
+  PENDING
+  UP
+  DOWN
+}
+
+enum CheckStatus {
+  SUCCESS
+  HTTP_ERROR
+  TIMEOUT
+  CONNECTION_ERROR
+  SSL_ERROR
+  UNKNOWN_ERROR
+}
+
+enum IncidentStatus {
+  OPEN
+  RESOLVED
+}
+
+// ─────────────────────────────────────────────────────────────
+// Existing auth model
+// ─────────────────────────────────────────────────────────────
+
 model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   name      String
-  password  String
+  password  String // must store a secure hash, never plaintext
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  monitors            Monitor[]
+  notificationSetting NotificationSetting?
+
   @@map("users")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Monitor
+// ─────────────────────────────────────────────────────────────
+
+model Monitor {
+  id                     Int           @id @default(autoincrement())
+  userId                 Int
+  name                   String
+  url                    String
+  description            String?
+  checkIntervalSeconds   Int           @default(300)
+  timeoutMs              Int           @default(10000)
+  isActive               Boolean       @default(true)
+  currentStatus          MonitorStatus @default(PENDING)
+  lastCheckedAt          DateTime?
+  lastResponseTimeMs     Int?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+  consecutiveFailures Int @default(0)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checkResults CheckResult[]
+  incidents    Incident[]
+
+  @@index([userId])
+  @@index([isActive])
+  @@map("monitors")
+}
+
+// ─────────────────────────────────────────────────────────────
+// CheckResult — immutable check history
+// ─────────────────────────────────────────────────────────────
+
+model CheckResult {
+  id             Int         @id @default(autoincrement())
+  monitorId      Int
+  status         CheckStatus
+  httpStatusCode Int?
+  responseTimeMs Int?
+  errorType      String?
+  errorMessage   String?
+  checkedAt      DateTime    @default(now())
+
+  monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@index([monitorId, checkedAt])
+  @@map("check_results")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Incident — one outage period
+// ─────────────────────────────────────────────────────────────
+
+model Incident {
+  id             Int            @id @default(autoincrement())
+  monitorId      Int
+  startedAt      DateTime
+  resolvedAt     DateTime?
+  status         IncidentStatus @default(OPEN)
+  cause          String?
+  failureMessage String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@index([monitorId, status])
+  @@index([monitorId, startedAt])
+  @@map("incidents")
+}
+
+// ─────────────────────────────────────────────────────────────
+// NotificationSetting — one row per user
+// ─────────────────────────────────────────────────────────────
+
+model NotificationSetting {
+  id                Int      @id @default(autoincrement())
+  userId            Int      @unique
+  telegramChatId    String?
+  telegramEnabled   Boolean  @default(false)
+  notifyOnDown      Boolean  @default(true)
+  notifyOnRecovery  Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_settings")
 }

@@ -52,6 +52,15 @@ export class UserService {
     return this.prisma.user.findUnique({ where: { email } });
   }
 
+  // Used by AuthService.changePassword — returns the full row including hash
+  findByIdWithPassword(id: number) {
+    return this.prisma.user.findUnique({ where: { id } });
+  }
+
+  async updatePassword(id: number, password: string) {
+    await this.prisma.user.update({ where: { id }, data: { password } });
+  }
+
   async update(id: number, dto: UpdateUserDto) {
     await this.findOne(id);
     return this.prisma.user.update({

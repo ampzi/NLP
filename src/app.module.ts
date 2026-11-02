@@ -10,6 +10,10 @@ import { AuthModule } from './auth/auth.module.js';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard.js';
 import { ApiKeyMiddleware } from './middleware/api-key/api-key.middleware.js';
 import { UserController } from './user/user.controller.js';
+import { MonitorsModule } from './monitors/monitors.module.js';
+import { MonitoringModule } from './monitoring/monitoring.module.js';
+import { NotificationSettingsModule } from './notification-settings/notification-settings.module.js';
+import { IncidentsModule } from './incidents/incidents.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -24,6 +28,10 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     PrismaModule,
     UserModule,
     AuthModule,
+    MonitorsModule,
+    MonitoringModule,
+    NotificationSettingsModule,
+    IncidentsModule,
   ],
   controllers: [AppController],
   providers: [

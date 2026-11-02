@@ -4,11 +4,13 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
 } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { Public } from './decorators/public.decorator.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
 
@@ -32,5 +34,13 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: unknown) {
     return user;
+  }
+
+  @Patch('password')
+  changePassword(
+    @CurrentUser('id') userId: number,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.auth.changePassword(userId, dto);
   }
 }

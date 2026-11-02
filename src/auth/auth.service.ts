@@ -8,6 +8,7 @@ import * as bcrypt from 'bcrypt';
 import { UserService } from '../user/user.service.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { ChangePasswordDto } from './dto/change-password.dto.js';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -33,6 +34,18 @@ export class AuthService {
     const ok = user ? await bcrypt.compare(dto.password, user.password) : false;
     if (!user || !ok) throw new UnauthorizedException('Invalid credentials');
     return this.sign(user);
+  }
+
+  async changePassword(userId: number, dto: ChangePasswordDto) {
+    const user = await this.users.findByIdWithPassword(userId);
+    if (!user) throw new UnauthorizedException();
+
+    const ok = await bcrypt.compare(dto.currentPassword, user.password);
+    if (!ok) throw new UnauthorizedException('Current password is incorrect');
+
+    const password = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
+    await this.users.updatePassword(userId, password);
+    return { ok: true };
   }
 
   private sign(user: { id: number; email: string; name: string }) {
